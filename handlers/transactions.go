@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
+
+	"github.com/jmoiron/sqlx"
 )
 
 type TransactionRequest struct {
@@ -14,12 +17,20 @@ type TransactionRequest struct {
 	ReceiverID *int64  `json:"receiver_id,omitempty"`
 }
 
+func (h *UserHandler) WriteTransaction(tx *sqlx.Tx, sender_id int64, receiver_id int64, amount float64, transactionType models.TransactionType, created_at time.Time) error {
+	_, err := tx.Exec(
+		`INSERT INTO transactions (sender_id, receiver_id, amount, type, created_at) VALUES ($1, $2, $3, $4, $5)`,
+		sender_id, receiver_id, amount, transactionType, created_at,
+	)
+	return err
+}
+
 func (h *UserHandler) Withdraw(w http.ResponseWriter, req *http.Request) {
 	var input TransactionRequest
 	userId, _ := middleware.GetUserID(req.Context())
 
 	if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
@@ -28,13 +39,18 @@ func (h *UserHandler) Withdraw(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	tx, _ := h.database.Beginx()
+	tx, err := h.database.Beginx()
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	var balance float64
 
-	err := tx.Get(&balance, "SELECT balance FROM users WHERE id = $1", userId)
+	err = tx.Get(&balance, "SELECT balance FROM users WHERE id = $1", userId)
 	if err != nil {
 		tx.Rollback()
-		http.Error(w, "Server error", http.StatusInternalServerError)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -47,12 +63,20 @@ func (h *UserHandler) Withdraw(w http.ResponseWriter, req *http.Request) {
 	_, err = tx.Exec("UPDATE users SET balance = balance - $1 WHERE id = $2", input.Amount, userId)
 	if err != nil {
 		tx.Rollback()
-		http.Error(w, "Server error", http.StatusInternalServerError)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+
+	err = h.WriteTransaction(tx, userId, userId, input.Amount, models.Withdraw, time.Now())
+	if err != nil {
+		tx.Rollback()
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	err = tx.Commit()
 	if err != nil {
-		http.Error(w, "Server error", http.StatusInternalServerError)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -65,20 +89,42 @@ func (h *UserHandler) Deposit(w http.ResponseWriter, req *http.Request) {
 	userID, _ := middleware.GetUserID(req.Context())
 
 	if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if input.Amount < 0 {
-		http.Error(w, "Amount must be greater than 0", http.StatusBadRequest)
+	if input.Amount <= 0 {
+		http.Error(w, "Amount must be greater than zero", http.StatusBadRequest)
 		return
 	}
 
-	_, err := h.database.Exec("UPDATE users SET balance = balance + $1 WHERE id = $2", input.Amount, userID)
+	tx, err := h.database.Beginx()
 	if err != nil {
-		http.Error(w, "Server error", http.StatusInternalServerError)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+
+	_, err = tx.Exec("UPDATE users SET balance = balance + $1 WHERE id = $2", input.Amount, userID)
+	if err != nil {
+		tx.Rollback()
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	err = h.WriteTransaction(tx, userID, userID, input.Amount, models.Deposit, time.Now())
+	if err != nil {
+		tx.Rollback()
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err = tx.Commit(); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Deposit successful"))
 }
 
 func (h *UserHandler) Transfer(w http.ResponseWriter, req *http.Request) {
@@ -86,12 +132,12 @@ func (h *UserHandler) Transfer(w http.ResponseWriter, req *http.Request) {
 	userID, _ := middleware.GetUserID(req.Context())
 
 	if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if input.Amount <= 0 {
-		http.Error(w, "Amount must be greater than 0", http.StatusBadRequest)
+		http.Error(w, "Amount must be greater than zero", http.StatusBadRequest)
 		return
 	}
 
@@ -109,30 +155,27 @@ func (h *UserHandler) Transfer(w http.ResponseWriter, req *http.Request) {
 		Isolation: sql.LevelRepeatableRead,
 	})
 	if err != nil {
-		http.Error(w, "Server error", http.StatusInternalServerError)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	var receiver models.User
 	var sender models.User
 
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-		}
-	}()
-
 	err = tx.Get(&sender, "SELECT * FROM users WHERE id = $1 FOR UPDATE", userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			tx.Rollback()
 			http.Error(w, "Sender not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, "Server error", http.StatusInternalServerError)
+		tx.Rollback()
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	if sender.Balance < input.Amount {
+		tx.Rollback()
 		http.Error(w, "Insufficient funds", http.StatusBadRequest)
 		return
 	}
@@ -140,28 +183,39 @@ func (h *UserHandler) Transfer(w http.ResponseWriter, req *http.Request) {
 	err = tx.Get(&receiver, "SELECT * FROM users WHERE id = $1 FOR UPDATE", input.ReceiverID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			tx.Rollback()
 			http.Error(w, "Receiver not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, "Server error", http.StatusInternalServerError)
+		tx.Rollback()
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	_, err = tx.Exec("UPDATE users SET balance = balance - $1 WHERE id = $2", input.Amount, userID)
 	if err != nil {
-		http.Error(w, "Server error", http.StatusInternalServerError)
+		tx.Rollback()
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	_, err = tx.Exec("UPDATE users SET balance = balance + $1 WHERE id = $2", input.Amount, input.ReceiverID)
 	if err != nil {
-		http.Error(w, "Server error", http.StatusInternalServerError)
+		tx.Rollback()
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	err = h.WriteTransaction(tx, userID, *input.ReceiverID, input.Amount, models.Transfer, time.Now())
+	if err != nil {
+		tx.Rollback()
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		http.Error(w, "Server error", http.StatusInternalServerError)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
