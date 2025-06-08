@@ -67,9 +67,10 @@ func (h *UserHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	newUser.Password = string(hashedPassword)
 
 	_, err = h.database.Exec(
-		`INSERT INTO users (id, username, name, email, password, balance) VALUES ($1, $2, $3, $4, $5, $6)`,
-		newUser.ID, newUser.Username, newUser.Name, newUser.Email, newUser.Password, 0,
+		`INSERT INTO users (username, name, email, password, balance) VALUES ($1, $2, $3, $4, $5)`,
+		newUser.Username, newUser.Name, newUser.Email, newUser.Password, 0,
 	)
+
 	if err != nil {
 		http.Error(w, "Failed to create user", http.StatusInternalServerError)
 		return
@@ -129,7 +130,7 @@ func (h *UserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-type", "application/json")
 	var users []models.User
 
-	if err := h.database.Select(&users, "SELECT id, name, email FROM users"); err != nil {
+	if err := h.database.Select(&users, "SELECT id, username, name, email, balance FROM users"); err != nil {
 		http.Error(w, "Server error", http.StatusInternalServerError)
 		return
 	}
@@ -139,7 +140,7 @@ func (h *UserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(&users); err != nil {
+	if err := json.NewEncoder(w).Encode(users); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		log.Printf("JSON encoding error in GetUsers: %v", err)
 		return

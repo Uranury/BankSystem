@@ -22,6 +22,8 @@ func main() {
 	}
 
 	router := mux.NewRouter()
+	router.Use(middleware.Logger)
+
 	protected := router.NewRoute().Subrouter()
 	protected.Use(middleware.JWTAuth)
 
@@ -32,6 +34,7 @@ func main() {
 
 	protected.HandleFunc("/withdraw", userHandler.Withdraw).Methods("POST")
 	protected.HandleFunc("/deposit", userHandler.Deposit).Methods("POST")
+	protected.HandleFunc("/transfer", userHandler.Transfer).Methods("POST")
 
 	log.Printf("Server running on %s", os.Getenv("LISTEN_ADDR"))
 	if err := http.ListenAndServe(os.Getenv("LISTEN_ADDR"), router); err != nil {
