@@ -222,3 +222,22 @@ func (h *UserHandler) Transfer(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Transaction successful"))
 }
+
+func (h *UserHandler) GetTransactions(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var transactions []models.TransactionInfo
+
+	err := h.database.Select(&transactions, "SELECT * FROM transactions")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if len(transactions) == 0 {
+		json.NewEncoder(w).Encode([]models.TransactionInfo{})
+		return
+	}
+
+	json.NewEncoder(w).Encode(transactions)
+}

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
@@ -57,6 +58,8 @@ func (h *UserHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Server error", http.StatusInternalServerError)
 		return
 	}
+
+	newUser.Password = strings.TrimSpace(newUser.Password)
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newUser.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -110,6 +113,8 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Server error", http.StatusInternalServerError)
 		return
 	}
+
+	logUser.Password = strings.TrimSpace(logUser.Password)
 
 	err = bcrypt.CompareHashAndPassword([]byte(existingUser.Password), []byte(logUser.Password))
 	if err != nil {

@@ -35,6 +35,7 @@ func main() {
 	protected.HandleFunc("/withdraw", userHandler.Withdraw).Methods("POST")
 	protected.HandleFunc("/deposit", userHandler.Deposit).Methods("POST")
 	protected.HandleFunc("/transfer", userHandler.Transfer).Methods("POST")
+	protected.HandleFunc("/transactions", userHandler.GetTransactions).Methods("GET")
 
 	log.Printf("Server running on %s", os.Getenv("LISTEN_ADDR"))
 	if err := http.ListenAndServe(os.Getenv("LISTEN_ADDR"), router); err != nil {
