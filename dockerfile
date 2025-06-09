@@ -16,6 +16,7 @@ WORKDIR /root/
 
 COPY --from=builder /app/main .
 COPY --from=builder /app/.env .
+COPY --from=builder /app/wait-for-postgres.sh .
 COPY --from=builder /app/db/migrations ./db/migrations
 
 EXPOSE 8080
