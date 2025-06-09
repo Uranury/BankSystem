@@ -91,6 +91,7 @@ curl -X POST http://localhost:8080/signup \
   -H "Content-Type: application/json" \
   -d '{
     "username": "john_doe",
+    "name": "john",
     "email": "john@example.com", 
     "password": "secure_password"
   }'
