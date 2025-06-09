@@ -7,7 +7,7 @@
 - 🔐 JWT Authentication for secure access
 - 💰 Banking operations (Deposit, Withdraw, Transfer)
 - 📊 Transaction history tracking
-- 👥 User management system
+- 👥 User management system with role-based access
 - 🗄️ PostgreSQL Database with automated migrations
 - 🐳 Fully Dockerized setup
 - 🚀 RESTful API endpoints
@@ -72,16 +72,27 @@ POST   /login           - User login (returns JWT token)
 
 ### Protected Endpoints (Requires JWT Token)
 ```
+GET    /profile         - Get current user's profile information
 POST   /withdraw        - Withdraw money from account
 POST   /deposit         - Deposit money to account  
 POST   /transfer        - Transfer money between accounts
 ```
 
-### Authentication
+### Admin-Only Endpoints (Requires JWT Token + Admin Role)
+```
+GET    /transactions    - Get all transactions (admin access only)
+```
+
+### Authentication & Authorization
+
 For protected endpoints, include the JWT token in the Authorization header:
 ```
 Authorization: Bearer <your-jwt-token>
 ```
+
+**User Roles:**
+- `user`: Default role for regular users (can access profile, banking operations)
+- `admin`: Administrative role (can access all user endpoints + transaction history)
 
 ### Example Requests
 
@@ -105,6 +116,12 @@ curl -X POST http://localhost:8080/login \
     "username": "john_doe",
     "password": "secure_password"
   }'
+```
+
+**Get Profile (requires JWT):**
+```bash
+curl -X GET http://localhost:8080/profile \
+  -H "Authorization: Bearer <your-jwt-token>"
 ```
 
 **Deposit (requires JWT):**
@@ -138,6 +155,12 @@ curl -X POST http://localhost:8080/transfer \
   }'
 ```
 
+**Get All Transactions (requires admin JWT):**
+```bash
+curl -X GET http://localhost:8080/transactions \
+  -H "Authorization: Bearer <your-admin-jwt-token>"
+```
+
 ## Development
 
 ### Running Locally (without Docker)
@@ -156,14 +179,15 @@ curl -X POST http://localhost:8080/transfer \
 
 3. **Run the application**
    ```bash
-   go run main.go
+   go build -o main
+   ./main
    ```
 
 ## Database Schema
 
 The application uses three main tables:
 
-- **users**: Store user account information
+- **users**: Store user account information including roles
 - **transactions**: Record all financial operations (deposits, withdrawals, transfers)
 
 All banking operations (deposit, withdraw, transfer) are logged in the transactions table for complete audit trail.
@@ -202,6 +226,7 @@ You can test the API using tools like:
 │   ├── go.mod
 │   ├── go.sum
 │   └── main.go
+```
 
 ## Environment Variables
 
@@ -239,6 +264,11 @@ If you get a "port already in use" error:
 - Make sure to include `Bearer ` prefix in Authorization header
 - Check that your JWT token hasn't expired
 - Ensure you're calling `/login` first to get a valid token
+
+### Authorization Errors
+- For admin-only endpoints, ensure your user has `admin` role
+- Regular users cannot access `/transactions` endpoint
+- Check user role in database: `SELECT username, role FROM users;`
 
 ### Transaction Errors  
 - Verify account has sufficient balance for withdrawals/transfers

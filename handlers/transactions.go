@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"MockBankGo/auth"
 	"MockBankGo/middleware"
 	"MockBankGo/models"
 	"database/sql"
@@ -225,6 +226,12 @@ func (h *UserHandler) Transfer(w http.ResponseWriter, req *http.Request) {
 
 func (h *UserHandler) GetTransactions(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	role, _ := middleware.GetUserRole(req.Context())
+
+	if role != auth.Admin {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
 
 	var transactions []models.TransactionInfo
 

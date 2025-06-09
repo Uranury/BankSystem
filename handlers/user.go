@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"MockBankGo/auth"
+	"MockBankGo/middleware"
 	"MockBankGo/models"
 	"database/sql"
 	"encoding/json"
@@ -23,11 +24,6 @@ func NewUserHandler(db *sqlx.DB) *UserHandler {
 
 func (h *UserHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
 
 	var newUser models.User
 	var existingUser models.User
@@ -70,8 +66,8 @@ func (h *UserHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	newUser.Password = string(hashedPassword)
 
 	_, err = h.database.Exec(
-		`INSERT INTO users (username, name, email, password, balance) VALUES ($1, $2, $3, $4, $5)`,
-		newUser.Username, newUser.Name, newUser.Email, newUser.Password, 0,
+		`INSERT INTO users (username, name, email, password, balance, role) VALUES ($1, $2, $3, $4, $5, $6)`,
+		newUser.Username, newUser.Name, newUser.Email, newUser.Password, 0, auth.User,
 	)
 
 	if err != nil {
@@ -85,11 +81,6 @@ func (h *UserHandler) Signup(w http.ResponseWriter, r *http.Request) {
 
 func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
 
 	var logUser models.User
 	var existingUser models.User
@@ -122,7 +113,7 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.GenerateJWT(existingUser.ID)
+	token, err := auth.GenerateJWT(existingUser.ID, string(existingUser.Role))
 	if err != nil {
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
@@ -135,7 +126,7 @@ func (h *UserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-type", "application/json")
 	var users []models.User
 
-	if err := h.database.Select(&users, "SELECT id, username, name, email, balance FROM users"); err != nil {
+	if err := h.database.Select(&users, "SELECT id, username, name, email, balance, role FROM users"); err != nil {
 		http.Error(w, "Server error", http.StatusInternalServerError)
 		return
 	}
@@ -150,4 +141,34 @@ func (h *UserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 		log.Printf("JSON encoding error in GetUsers: %v", err)
 		return
 	}
+}
+
+func (h *UserHandler) Profile(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	userID, _ := middleware.GetUserID(req.Context())
+
+	var userProfile models.User
+	err := h.database.Get(&userProfile, "SELECT * FROM users WHERE id = $1", userID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	response := struct {
+		Username string  `json:"username"`
+		Name     string  `json:"name"`
+		Email    string  `json:"email"`
+		Balance  float64 `json:"balance"`
+	}{
+		Username: userProfile.Username,
+		Name:     userProfile.Name,
+		Email:    userProfile.Email,
+		Balance:  userProfile.Balance,
+	}
+
+	json.NewEncoder(w).Encode(response)
 }
