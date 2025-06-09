@@ -14,7 +14,7 @@ import (
 )
 
 func ConnectDB() (*sqlx.DB, error) {
-	err := godotenv.Load("config/.env")
+	err := godotenv.Load()
 	if err != nil {
 		log.Println("Error loading .env file")
 	}
