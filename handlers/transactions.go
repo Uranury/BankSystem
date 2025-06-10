@@ -26,6 +26,10 @@ func (h *UserHandler) WriteTransaction(tx *sqlx.Tx, sender_id int64, receiver_id
 	return err
 }
 
+func (h *UserHandler) AmountGreaterThanZero(amount float64) bool {
+	return amount > 0
+}
+
 func (h *UserHandler) Withdraw(w http.ResponseWriter, req *http.Request) {
 	var input TransactionRequest
 	userId, _ := middleware.GetUserID(req.Context())
@@ -35,7 +39,7 @@ func (h *UserHandler) Withdraw(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if input.Amount <= 0 {
+	if !h.AmountGreaterThanZero(input.Amount) {
 		http.Error(w, "Amount must be greater than zero", http.StatusBadRequest)
 		return
 	}
@@ -94,7 +98,7 @@ func (h *UserHandler) Deposit(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if input.Amount <= 0 {
+	if !h.AmountGreaterThanZero(input.Amount) {
 		http.Error(w, "Amount must be greater than zero", http.StatusBadRequest)
 		return
 	}
@@ -137,7 +141,7 @@ func (h *UserHandler) Transfer(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if input.Amount <= 0 {
+	if !h.AmountGreaterThanZero(input.Amount) {
 		http.Error(w, "Amount must be greater than zero", http.StatusBadRequest)
 		return
 	}
