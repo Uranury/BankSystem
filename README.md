@@ -216,9 +216,14 @@ You can test the API using tools like:
 │   ├── db/
 │   │   ├── migrations/      # Database migration files
 │   │   └── db.go            # Database connection logic
-│   ├── handlers/            # HTTP request handlers
+│   ├── internal/
+│   │   ├── handlers/        # HTTP request handlers
+│   │   ├── repositories/    # Data access layer
+│   │   ├── services/        # Business logic layer
+│   │   ├── models/          # User and transaction models
+│   │   ├── apperrors/       # Custom error definitions
+│   │   └── builders.go      # Dependency injection builders
 │   ├── middleware/          # JWT auth & logging middleware
-│   ├── models/              # User and transaction models
 │   ├── auth/                # JWT generation and verification logic
 │   ├── Dockerfile
 │   ├── docker-compose.yml
