@@ -17,7 +17,7 @@ type TransactionHandler struct {
 
 type TransactionInput struct {
 	Amount     float64 `json:"amount"`
-	ReceiverID *int64  `json:"receiver_id,omitempty"`
+	ReceiverID *int64  `json:"receiver_id"`
 }
 
 func NewTransactionHandler(db *sqlx.DB, transaction_service *services.TransactionService) *TransactionHandler {
