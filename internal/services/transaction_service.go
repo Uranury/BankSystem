@@ -12,12 +12,12 @@ import (
 )
 
 type TransactionService struct {
-	transactionRepo *repositories.TransactionRepository
+	transactionRepo repositories.ITransationRepository
 	userRepo        *repositories.UserRepository
 	database        *sqlx.DB
 }
 
-func NewTransactionService(trepo *repositories.TransactionRepository, urepo *repositories.UserRepository, db *sqlx.DB) *TransactionService {
+func NewTransactionService(trepo repositories.ITransationRepository, urepo *repositories.UserRepository, db *sqlx.DB) *TransactionService {
 	return &TransactionService{transactionRepo: trepo, userRepo: urepo, database: db}
 }
 

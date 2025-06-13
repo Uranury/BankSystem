@@ -7,6 +7,14 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+type IUserRepository interface {
+	GetUserByEmail(email string) (*models.User, error)
+	GetUserByUsername(username string) (*models.User, error)
+	CreateUser(user *models.User) error
+	GetUsers() ([]models.User, error)
+	GetUserById(id int64) (*models.User, error)
+}
+
 type UserRepository struct {
 	database *sqlx.DB
 }

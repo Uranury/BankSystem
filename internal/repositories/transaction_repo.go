@@ -7,6 +7,13 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+type ITransationRepository interface {
+	WriteTransaction(tx *sqlx.Tx, senderID int64, receiverID int64, amount float64, transactionType models.TransactionType, createdAt time.Time) error
+	IncreaseBalance(tx *sqlx.Tx, userID int64, amount float64) error
+	DecreaseBalance(tx *sqlx.Tx, userID int64, amount float64) error
+	GetTransactions() ([]models.TransactionInfo, error)
+}
+
 type TransactionRepository struct {
 	database *sqlx.DB
 }

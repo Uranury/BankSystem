@@ -73,6 +73,8 @@ func (h *TransactionHandler) Deposit(w http.ResponseWriter, req *http.Request) {
 		h.handleError(w, err)
 		return
 	}
+
+	w.Write([]byte("Deposit successful!"))
 }
 
 func (h *TransactionHandler) Transfer(w http.ResponseWriter, req *http.Request) {
